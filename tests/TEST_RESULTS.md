@@ -1,7 +1,7 @@
 # Precious AI — Workflow Test Report
 
-- Run at: 2026-09-18T15:36:10
-- Target: http://127.0.0.1:8000
+- Run at: 2026-09-18T16:37:46
+- Target: http://127.0.0.1:8123
 - Embedder: sentence-transformers/all-MiniLM-L6-v2 (local ONNX, free)
 - Provider/model: groq / openai/gpt-oss-120b
 - Live API key configured at run time: yes

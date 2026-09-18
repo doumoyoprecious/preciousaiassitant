@@ -3,13 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b0e14">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#17181d">
 <meta name="description" content="Precious AI — your personal AI agent that only says what it knows, with real citations, memory you approve, and full owner controls.">
 <title>Precious AI</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/css/app.css">
-<!-- Vercel Speed Insights (only active when this UI is hosted on Vercel;
-     it's an inert 404-free script elsewhere. Remove freely if unused.) -->
+<script>
+/* apply persisted theme before first paint (prevents flash) */
+(function(){
+  var t;
+  try { t = localStorage.getItem("pa-theme") || "auto"; } catch(e){ t = "auto"; }
+  if (t === "auto") t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<!-- Vercel Speed Insights (only active when hosted on Vercel) -->
 <script src="/_speedinsights.js" defer></script>
 <!-- Deployment config (API base URL for split hosting). Loads first. -->
 <script src="/config.js"></script>
@@ -19,7 +28,7 @@
 <!-- ======= AUTH ======= -->
 <div id="auth-screen" class="auth-screen hidden">
   <div class="auth-card">
-    <div class="auth-logo">✦</div>
+    <div class="auth-logo" aria-hidden="true">✦</div>
     <h1>Precious AI</h1>
     <p class="auth-sub" id="auth-sub">Your personal AI agent — set up your owner account</p>
     <form id="auth-form" autocomplete="off">
@@ -28,52 +37,40 @@
         <input id="auth-username" type="text" autocomplete="username" placeholder="owner" required>
       </label>
       <label class="field">
-        <span>Password (min 8 characters)</span>
-        <input id="auth-password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+        <span>Password</span>
+        <input id="auth-password" type="password" autocomplete="current-password"
+               placeholder="At least 8 characters" required>
       </label>
       <button type="submit" class="btn btn-primary btn-block" id="auth-submit">Create owner account</button>
-      <div id="auth-error" class="form-error"></div>
+      <div id="auth-error" class="form-error" role="alert" aria-live="polite"></div>
     </form>
-    <p class="auth-note">Owner access controls the entire agent. This account is required to use Precious AI.</p>
+    <p class="auth-note">Owner access controls the entire agent. Your data stays on your server —
+      nothing is stored elsewhere.</p>
   </div>
 </div>
 
 <!-- ======= APP ======= -->
 <div id="app" class="hidden">
-  <aside id="sidebar">
-    <div class="brand"><span class="brand-mark">✦</span><span>Precious AI</span></div>
-    <nav class="side-nav">
-      <button data-view="chat" class="active">Chat</button>
-      <button data-view="knowledge">Knowledge</button>
-      <button data-view="memory">Memory</button>
-      <button data-view="training">Learn</button>
-      <button data-view="admin">Admin</button>
-    </nav>
-    <div class="side-foot">
-      <div id="provider-chip" class="chip" title="Active model">…</div>
-      <button id="logout-btn" class="btn btn-ghost btn-sm">Log out</button>
-    </div>
-  </aside>
+  <aside id="sidebar" aria-label="Main menu"></aside>
+  <div id="drawer" role="dialog" aria-modal="true" aria-label="Menu"></div>
+  <div id="drawer-backdrop"></div>
 
-  <main id="main">
+  <div id="main">
     <header id="topbar">
-      <button id="burger" class="icon-btn" title="Conversations">☰</button>
+      <button id="burger" class="icon-btn" aria-label="Open menu" aria-haspopup="dialog">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
       <div id="view-title">Chat</div>
-      <div id="topbar-actions"></div>
+      <div id="topbar-actions">
+        <button id="theme-btn" class="icon-btn" aria-label="Toggle light or dark theme"></button>
+      </div>
     </header>
     <div id="view-root"></div>
-  </main>
-
-  <nav id="bottomnav">
-    <button data-view="chat" class="active">Chat</button>
-    <button data-view="knowledge">Knowledge</button>
-    <button data-view="memory">Memory</button>
-    <button data-view="training">Learn</button>
-    <button data-view="admin">Admin</button>
-  </nav>
+  </div>
 </div>
 
-<div id="toasts"></div>
+<div id="toasts" aria-live="polite"></div>
 <div id="modal-root"></div>
 
 <script src="/js/common.js"></script>

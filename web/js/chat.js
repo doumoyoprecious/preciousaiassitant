@@ -1,4 +1,4 @@
-/* ============ Chat view ============ */
+/* ============ Chat view — conversational experience ============ */
 "use strict";
 
 const Chat = {
@@ -7,109 +7,175 @@ const Chat = {
   files: [],
   busy: false,
   search: "",
+  atBottom: true,
+  stage: null,
+  col: null,
+  msgsEl: null,
+  input: null,
 
   init(root) {
+    if (this.mounted && this.stage && root.contains(this.stage)) return; // keep state
+    const prev = this.current; // preserve conversation across view switches
     this.current = null;
     this.files = [];
     this.busy = false;
+    this.atBottom = true;
+
     root.innerHTML = `
-      <div class="chat-wrap">
-        <div class="conv-pane" id="conv-pane"></div>
-        <div class="chat-main">
-          <div class="messages empty-state" id="messages">
-            <div class="big">✦</div>
-            <div><b>Precious AI</b> is ready.</div>
-            <div class="small">Ask me anything, attach a document, or teach me something in Learn.</div>
-          </div>
-          <div class="composer">
-            <div class="attach-row" id="attach-row"></div>
-            <div class="composer-row">
-              <input type="file" id="file-input" multiple class="hidden"
-                accept=".pdf,.txt,.md,.markdown,.csv,.docx">
-              <div class="composer-box">
-                <button class="icon-btn" id="attach-btn" title="Attach files (PDF, DOCX, TXT, MD, CSV)">📎</button>
-                <textarea id="chat-input" rows="1" placeholder="Message Precious AI…"></textarea>
-              </div>
-              <button class="send-btn" id="send-btn" title="Send">➤</button>
-            </div>
-            <div class="small faint" style="margin-top:6px;text-align:center">Precious AI can make mistakes. Verify important information.</div>
-          </div>
+      <div class="chat-stage" id="chat-stage">
+        <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Conversation">
+          <div class="msg-col" id="msg-col"></div>
         </div>
-      </div>
-      <div class="conv-backdrop" id="conv-backdrop"></div>
-      <div class="drawer" id="conv-drawer"></div>`;
+        <button class="jump-latest" id="jump-latest" aria-label="Jump to latest message">
+          ${icon("chevron", 14)} Jump to latest
+        </button>
+        <div class="composer">
+          <div class="composer-shell">
+            <div class="attach-row" id="attach-row"></div>
+            <div class="composer-box">
+              <button class="comp-btn" id="attach-btn" title="Attach files (PDF, DOCX, TXT, MD, CSV)"
+                      aria-label="Attach files">${icon("clip", 18)}</button>
+              <textarea id="chat-input" rows="1" placeholder="Message Precious AI…"
+                        aria-label="Message Precious AI" enterkeyhint="send"></textarea>
+              <button class="send-btn" id="send-btn" title="Send" aria-label="Send message"
+                      disabled>${icon("send", 16)}</button>
+            </div>
+            <input type="file" id="file-input" multiple class="hidden"
+                   accept=".pdf,.txt,.md,.markdown,.csv,.docx">
+          </div>
+          <div class="composer-hint">Precious AI can make mistakes. Verify important information.</div>
+        </div>
+      </div>`;
 
-    const drawerHtml = () => this._convListHtml(true);
-    $("#conv-pane", root).innerHTML = this._convListHtml(false);
-    $("#conv-drawer", root).innerHTML = this._convListHtml(true);
+    this.stage = $("#chat-stage");
+    this.msgsEl = $("#messages");
+    this.col = $("#msg-col");
+    this.input = $("#chat-input");
+    this.mounted = true;
 
-    // conversation list actions (both panes)
-    for (const pane of [$("#conv-pane", root), $("#conv-drawer", root)]) {
-      this._wireConvList(pane, root);
-    }
-    $("#burger", document).onclick = () => this.toggleDrawer();
-    $("#conv-backdrop", root).onclick = () => this.toggleDrawer(false);
-
-    // composer
-    const input = $("#chat-input", root);
-    input.addEventListener("input", () => {
-      input.style.height = "auto";
-      input.style.height = Math.min(input.scrollHeight, 140) + "px";
+    // ---- composer behavior ----
+    const sendBtn = $("#send-btn");
+    this.input.addEventListener("input", () => {
+      this.autoGrow();
+      this.setSendState();
     });
-    input.addEventListener("keydown", e => {
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.send(); }
-    });
-    $("#send-btn", root).onclick = () => this.send();
-    $("#attach-btn", root).onclick = () => $("#file-input", root).click();
-    $("#file-input", root).onchange = async e => {
-      for (const f of e.target.files) {
-        if (this.files.length >= 5) { toast("Maximum 5 files at a time.", "err"); break; }
-        if (f.size > 25 * 1024 * 1024) { toast(`'${f.name}' is larger than 25 MB.`, "err"); continue; }
-        this.files.push(f);
+    this.input.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        this.send();
       }
+    });
+    sendBtn.onclick = () => this.send();
+    $("#attach-btn").onclick = () => $("#file-input").click();
+    $("#file-input").onchange = e => {
+      this.addFiles([...e.target.files]);
       e.target.value = "";
-      this.renderAttachments();
     };
+
+    // ---- drag & drop (desktop) ----
+    let dragDepth = 0;
+    this.stage.addEventListener("dragenter", e => {
+      if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) {
+        e.preventDefault();
+        dragDepth++;
+        this.stage.classList.add("dragover");
+      }
+    });
+    this.stage.addEventListener("dragover", e => {
+      if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault();
+    });
+    this.stage.addEventListener("dragleave", () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (!dragDepth) this.stage.classList.remove("dragover");
+    });
+    this.stage.addEventListener("drop", e => {
+      dragDepth = 0;
+      this.stage.classList.remove("dragover");
+      if (e.dataTransfer && e.dataTransfer.files.length) {
+        e.preventDefault();
+        this.addFiles([...e.dataTransfer.files]);
+      }
+    });
+
+    // ---- scroll behavior ----
+    this.msgsEl.addEventListener("scroll", () => {
+      this.atBottom = this.isNearBottom();
+      $("#jump-latest").classList.toggle("show", !this.atBottom);
+    });
+    $("#jump-latest").onclick = () => this.scrollToBottom(true);
+
     this.loadConvs();
   },
 
-  _convListHtml(isDrawer) {
-    return `
-      <div class="conv-head">
-        <button class="btn btn-primary btn-block" data-act="new">＋ New conversation</button>
-        <input id="conv-search" type="search" placeholder="Search conversations…" class="small" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px">
-      </div>
-      <div class="conv-list" data-convlist>
-        <div class="small faint" style="padding:12px">Loading…</div>
-      </div>`;
+  /* ---------- helpers ---------- */
+
+  autoGrow() {
+    this.input.style.height = "auto";
+    this.input.style.height = Math.min(this.input.scrollHeight, 190) + "px";
   },
 
-  _wireConvList(pane, root) {
-    const list = $("[data-convlist]", pane);
-    pane.addEventListener("click", e => {
-      const btn = e.target.closest("[data-act]");
-      if (btn) {
-        if (btn.dataset.act === "new") { this.newChat(); return; }
-        const cid = btn.dataset.id;
-        if (btn.dataset.act === "rename") { this.renameConv(cid); return; }
-        if (btn.dataset.act === "clear") { this.clearConv(cid); return; }
-        if (btn.dataset.act === "delete") { this.deleteConv(cid); return; }
-        return;
+  setSendState() {
+    const btn = $("#send-btn");
+    if (!btn) return;
+    const empty = !this.input.value.trim() && !this.files.length;
+    if (this.busy) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spin" aria-hidden="true"></span>';
+    } else {
+      btn.disabled = empty;
+      btn.innerHTML = icon("send", 16);
+    }
+  },
+
+  addFiles(fileList) {
+    for (const f of fileList) {
+      if (this.files.length >= 5) { toast("Maximum 5 files at a time.", "err"); break; }
+      if (f.size > 25 * 1024 * 1024) { toast(`'${f.name}' is larger than 25 MB.`, "err"); continue; }
+      if (!SUPPORTED_EXT.test(f.name)) {
+        toast(`'${f.name}' isn't supported. Upload PDF, DOCX, TXT, MD or CSV files.`, "err");
+        continue;
       }
-      const item = e.target.closest(".conv-item");
-      if (item) {
-        this.selectConv(item.dataset.id);
-        if (item.closest(".drawer")) this.toggleDrawer(false);
-      }
-    });
-    const search = $("#conv-search", pane);
-    if (search) search.addEventListener("input", () => {
-      this.search = search.value.trim();
-      this.refreshConvList();
+      this.files.push(f);
+    }
+    this.renderAttachments();
+    this.setSendState();
+    this.input.focus();
+  },
+
+  renderAttachments() {
+    const row = $("#attach-row");
+    if (!row) return;
+    row.innerHTML = "";
+    this.files.forEach((f, i) => {
+      const el = document.createElement("span");
+      el.className = "attach";
+      el.innerHTML = `${icon("doc", 13)} <span class="nm">${esc(f.name)}</span>
+        <b>${fmtBytes(f.size)}</b>
+        <button data-i="${i}" aria-label="Remove ${esc(f.name)}">${icon("x", 11)}</button>`;
+      el.querySelector("button").onclick = () => {
+        this.files.splice(i, 1);
+        this.renderAttachments();
+        this.setSendState();
+      };
+      row.appendChild(el);
     });
   },
 
-  async loadConvs() {
+  isNearBottom() {
+    return this.msgsEl.scrollHeight - this.msgsEl.scrollTop - this.msgsEl.clientHeight < 90;
+  },
+
+  scrollToBottom(smooth = false) {
+    this.msgsEl.scrollTo({ top: this.msgsEl.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  },
+
+  maybeScroll(force = false) {
+    if (force || this.isNearBottom()) this.scrollToBottom(true);
+  },
+
+  /* ---------- conversations ---------- */
+
+  async loadConvs(preferId) {
     try {
       this.convs = await api("/api/conversations");
     } catch (e) {
@@ -117,38 +183,18 @@ const Chat = {
       toast(e.message, "err");
       return;
     }
-    this.refreshConvList();
-    if (!this.current && this.convs.length) {
+    if (this.current && !this.convs.some(c => c.id === this.current)) this.current = null;
+    Sidebar.refresh();
+    if (this.current) {
+      const c = this.convs.find(x => x.id === this.current);
+      if (c && c.title && window.App) App.setTitle(c.title);
+    }
+    if (!this.current && preferId && this.convs.some(c => c.id === preferId)) {
+      this.selectConv(preferId, true);
+    } else if (!this.current && this.convs.length) {
       this.selectConv(this.convs[0].id, true);
     } else if (!this.current) {
       this.newChat(true);
-    }
-  },
-
-  refreshConvList() {
-    const q = this.search.toLowerCase();
-    const rows = q
-      ? this.convs.filter(c => (c.title || "").toLowerCase().includes(q) || (c.last_content || "").toLowerCase().includes(q))
-      : this.convs;
-    for (const pane of $$(".conv-pane, .drawer")) {
-      const list = $("[data-convlist]", pane);
-      if (!list) continue;
-      list.innerHTML = rows.length ? "" : `<div class="small faint" style="padding:12px">No conversations found.</div>`;
-      for (const c of rows) {
-        const el = document.createElement("div");
-        el.className = "conv-item" + (c.id === this.current ? " active" : "");
-        el.dataset.id = c.id;
-        el.innerHTML = `
-          <div class="t">${esc(c.title || "New conversation")}</div>
-          <div class="s">${esc(c.last_content || "—")} · ${timeAgo(c.updated_at)}</div>
-          <div class="row" style="margin-top:6px;display:none" data-actions>
-            <button class="btn btn-ghost btn-sm" data-act="rename" data-id="${c.id}">Rename</button>
-            <button class="btn btn-ghost btn-sm" data-act="clear" data-id="${c.id}">Clear</button>
-            <button class="btn btn-ghost btn-sm" data-act="delete" data-id="${c.id}" style="color:var(--err)">Delete</button>
-          </div>`;
-        el.addEventListener("mouseenter", () => { $("[data-actions]", el).style.display = "flex"; });
-        list.appendChild(el);
-      }
     }
   },
 
@@ -156,92 +202,302 @@ const Chat = {
     let conv;
     try {
       conv = await api("/api/conversations", { body: {} });
-    } catch (e) { if (!silent) toast(e.message, "err"); return; }
+    } catch (e) {
+      if (!silent) toast(e.message, "err");
+      return;
+    }
     this.convs.unshift(conv);
     this.selectConv(conv.id, true);
   },
 
   async selectConv(id, noScroll) {
+    if (!this.col) return; // chat view not mounted
     this.current = id;
-    this.refreshConvList();
-    const msgsEl = $("#messages");
-    msgsEl.classList.remove("empty-state");
-    msgsEl.innerHTML = `<div class="small faint" style="padding:20px">Loading…</div>`;
+    Sidebar.refresh();
+    const conv = this.convs.find(c => c.id === id);
+    App.setTitle(conv ? conv.title : "Chat");
+
+    this.col.innerHTML = `<div class="small faint" style="padding:26px 6px">Loading…</div>`;
     try {
       const data = await api(`/api/conversations/${id}`);
       const msgs = await api(`/api/conversations/${id}/messages`);
-      msgsEl.innerHTML = "";
+      this.col.innerHTML = "";
+      App.setTitle(data.title);
       if (!msgs.length) {
-        msgsEl.classList.add("empty-state");
-        msgsEl.innerHTML = `<div class="big">✦</div><div><b>${esc(data.title)}</b></div>
-          <div class="small">Ask a question or attach a document to get started.</div>`;
+        const fresh = (data.title || "") === "New conversation";
+        this.col.appendChild(this.emptyStateEl(fresh ? null : data.title));
         return;
       }
-      for (const m of msgs) msgsEl.appendChild(this.renderMessage(m));
+      for (const m of msgs) this.col.appendChild(this.renderMessage(m));
       this.markLastRegenerable();
-      if (!noScroll) msgsEl.scrollTop = msgsEl.scrollHeight;
+      this.scrollToBottom();
+      this.atBottom = true;
+      $("#jump-latest").classList.remove("show");
     } catch (e) {
-      msgsEl.innerHTML = `<div class="msg-error-card" style="margin:20px">${esc(e.message)}</div>`;
+      this.col.innerHTML = `<div class="msg-error-card" style="max-width:780px;margin:20px auto">
+        ${esc(e.message)}</div>`;
     }
   },
 
+  emptyStateEl(convoTitle) {
+    const wrap = document.createElement("div");
+    wrap.className = "empty-state";
+    wrap.innerHTML = `
+      <div class="logo">✦</div>
+      <h2>${convoTitle ? esc(convoTitle) : "Precious AI"}</h2>
+      <div class="sub">${convoTitle ? "Ask a question or attach a document to get started." : "How can I help you today?"}</div>
+      ${convoTitle ? "" : `
+      <div class="suggest-grid" role="list">
+        ${SUGGESTIONS.map(s => `
+          <button class="suggest" role="listitem" data-sugg="${esc(s.t)}">
+            <b>${esc(s.t)}</b>${esc(s.d)}
+          </button>`).join("")}
+      </div>`}`;
+    wrap.querySelectorAll("[data-sugg]").forEach(b => {
+      b.onclick = () => {
+        this.input.value = b.dataset.sugg;
+        this.autoGrow();
+        this.setSendState();
+        this.input.focus();
+      };
+    });
+    return wrap;
+  },
+
+  /* ---------- message rendering ---------- */
+
   renderMessage(m) {
     const wrap = document.createElement("div");
-    wrap.className = `msg ${m.role === "user" ? "user" : "ai"}`;
     wrap.dataset.id = m.id;
     const isUser = m.role === "user";
-    let extra = "";
+
     if (isUser) {
-      if (m.training) extra = `<div class="train-pill" style="margin-bottom:6px">🎓 training</div>`;
-    } else {
-      if (m.steps && m.steps.length) {
-        extra += `<div class="msg-steps">${m.steps.map(s => `<span>⚡ ${esc(s)}</span>`).join("")}</div>`;
-      }
-      if (m.sources && m.sources.length) {
-        extra += `<div class="msg-sources">` + m.sources.map(s =>
-          `<span class="src-chip" title="relevance ${(s.score * 100).toFixed(0)}%">📄 <b>${esc(s.doc_name)}</b>${s.page ? ` · p.${s.page}` : ""}${s.section ? ` · ${esc(s.section)}` : ""}</span>`
-        ).join("") + `</div>`;
-      }
-      if (m.error) {
-        extra += `<div class="msg-error-card">${esc(m.error)}</div>`;
-      }
+      wrap.className = "msg user";
+      wrap.innerHTML = `
+        <div class="msg-body">
+          ${m.training ? `<div class="train-pill" style="margin-bottom:6px">Training</div>` : ""}
+          <div class="msg-text">${esc(m.content)}</div>
+        </div>`;
+      return wrap;
     }
-    const actions = isUser ? "" : `
-      <div class="msg-actions">
-        <button data-mact="copy">⧉ Copy</button>
-        <button data-mact="up" class="fb-up">👍 Helpful</button>
-        <button data-mact="down" class="fb-down">👎 Not helpful</button>
-        <button data-mact="issue">⚠ Report</button>
-        <button data-mact="regen" style="display:none">↻ Regenerate</button>
-      </div>`;
+
+    wrap.className = "msg ai";
+    let extra = "";
+    if (m.steps && m.steps.length) {
+      extra += `<div class="msg-steps">${m.steps.map(s => `<span>${esc(s)}</span>`).join("")}</div>`;
+    }
+    if (m.sources && m.sources.length) {
+      extra += `<div class="msg-sources">` + m.sources.map(s =>
+        `<span class="src-chip" title="relevance ${(s.score * 100).toFixed(0)}%">
+          ${icon("doc", 12)} <b>${esc(s.doc_name)}</b>${s.page ? ` · p.${s.page}` : ""}${s.section ? ` · ${esc(s.section)}` : ""}
+        </span>`).join("") + `</div>`;
+    }
+    if (m.error) {
+      extra += `<div class="msg-error-card">Something went wrong while processing this request.
+        <span class="small" style="opacity:.75"> · ${esc(m.error)}</span></div>`;
+    }
+    const meta = [timeAgo(m.created_at), m.model ? esc(m.model) : "",
+      m.tokens_out ? `${m.tokens_out} tokens` : ""].filter(Boolean).join(" · ");
+
     wrap.innerHTML = `
-      <div class="avatar">${isUser ? "You" : "✦"}</div>
+      <div class="avatar" aria-hidden="true">✦</div>
       <div class="msg-body">
-        <div class="msg-text">${md(m.content)}</div>
+        ${m.error ? "" : `<div class="msg-text">${md(m.content)}</div>`}
         ${extra}
-        <div class="msg-meta"><span>${timeAgo(m.created_at)}</span>${m.model ? `<span>${esc(m.model)}</span>` : ""}${m.tokens_out ? `<span>${m.tokens_out} tok out</span>` : ""}</div>
-        ${actions}
+        ${meta ? `<div class="msg-meta"><span>${meta}</span></div>` : ""}
+        <div class="msg-actions">
+          <button data-mact="copy" aria-label="Copy response">${icon("copy", 12)} Copy</button>
+          <button data-mact="regen" style="display:none" aria-label="Regenerate response">${icon("refresh", 12)} Regenerate</button>
+          <button data-mact="up" aria-label="Mark as helpful">${icon("up", 12)} Helpful</button>
+          <button data-mact="down" aria-label="Mark as not helpful">${icon("down", 12)} Not helpful</button>
+        </div>
       </div>`;
-    if (!isUser) {
-      wrap.querySelector('[data-mact="regen"]').style.display = "none"; // set after mount for last msg
-      const acts = wrap.querySelector(".msg-actions");
-      acts.addEventListener("click", e => {
-        const b = e.target.closest("[data-mact]");
-        if (!b) return;
-        const act = b.dataset.mact;
-        if (act === "copy") copyText(m.content);
-        else if (act === "up") this.sendFeedback(m, "up");
-        else if (act === "down" || act === "issue") this.sendFeedback(m, act);
-        else if (act === "regen") this.regenerate(m);
-      });
-    }
+
+    wrap.querySelector(".msg-actions").addEventListener("click", e => {
+      const b = e.target.closest("[data-mact]");
+      if (!b) return;
+      const act = b.dataset.mact;
+      if (act === "copy") copyText(m.content);
+      else if (act === "up") this.sendFeedback(m, "up");
+      else if (act === "down") this.sendFeedback(m, "down");
+      else if (act === "regen") this.regenerate(m);
+    });
     return wrap;
   },
 
   markLastRegenerable() {
-    $$(".msg.ai .msg-actions [data-mact=regen]").forEach(b => b.style.display = "none");
-    const last = $$(".msg.ai .msg-actions [data-mact=regen]").pop();
+    const btns = $$("#msg-col .msg.ai [data-mact=regen]");
+    btns.forEach(b => b.style.display = "none");
+    const last = btns[btns.length - 1];
     if (last) last.style.display = "";
+  },
+
+  thinkingEl(label = "Thinking…") {
+    const el = document.createElement("div");
+    el.className = "msg ai";
+    el.dataset.pending = "1";
+    el.innerHTML = `
+      <div class="avatar" aria-hidden="true">✦</div>
+      <div class="msg-body">
+        <div class="thinking">
+          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="lbl">${esc(label)}</span>
+        </div>
+      </div>`;
+    return el;
+  },
+
+  /* ---------- send / regenerate / retry ---------- */
+
+  async send() {
+    if (this.busy) return;
+    const text = this.input.value.trim();
+    if (!text && !this.files.length) return;
+    if (!this.current) await this.newChat(true);
+    const convId = this.current;
+    const conv = this.convs.find(c => c.id === convId);
+    const isTraining = this.files.length === 0 && (conv && (conv.title || "").startsWith("🎓"));
+
+    // optimistic user message
+    const es = this.col.querySelector(".empty-state");
+    if (es) es.remove();
+    this.col.appendChild(this.renderMessage({
+      id: "tmp-" + Date.now(), role: "user",
+      content: text || this.files.map(f => `${f.name} (attached)`).join("\n"),
+      training: isTraining, created_at: Math.floor(Date.now() / 1000),
+    }));
+    this.input.value = "";
+    this.autoGrow();
+    this.renderAttachmentsKeep = this.files.slice();
+    this.files = [];
+    this.renderAttachments();
+    this.setSendState();
+    this.scrollToBottom(true);
+    this.atBottom = true;
+
+    const wasNearBottom = true;
+    const pending = this.thinkingEl("Thinking…");
+    this.col.appendChild(pending);
+    this.busy = true;
+    this.setSendState();
+    const started = Date.now();
+    const lbl = pending.querySelector(".lbl");
+    const tick = setInterval(() => {
+      const s = Math.floor((Date.now() - started) / 1000);
+      if (s >= 4) lbl.textContent = `Thinking… ${s}s`;
+    }, 1000);
+
+    const fd = new FormData();
+    fd.append("content", text);
+    fd.append("training", isTraining ? "true" : "false");
+    this.renderAttachmentsKeep.forEach(f => fd.append("files", f));
+    this.renderAttachmentsKeep = null;
+
+    try {
+      const r = await api(`/api/conversations/${convId}/messages`, { body: fd });
+      clearInterval(tick);
+      pending.remove();
+      const el = this.renderMessage({ ...r, id: r.message_id, role: "assistant",
+        training: isTraining, created_at: Math.floor(Date.now() / 1000) });
+      this.col.appendChild(el);
+      if (r.suggestion) this.addSuggestion(el, r.suggestion);
+      this.markLastRegenerable();
+      this.maybeScroll(wasNearBottom);
+      this.loadConvs(); // sidebar titles / ordering (title auto-generated server-side)
+    } catch (e) {
+      clearInterval(tick);
+      pending.remove();
+      this.col.appendChild(this.errorEl(convId, e.message));
+      this.maybeScroll(true);
+    }
+    this.busy = false;
+    this.setSendState();
+    this.input.focus();
+  },
+
+  errorEl(convId, detail) {
+    const box = document.createElement("div");
+    box.className = "msg ai";
+    box.innerHTML = `
+      <div class="avatar" aria-hidden="true">✦</div>
+      <div class="msg-body">
+        <div class="msg-error-card">
+          Something went wrong while processing your request.
+          <div class="row"><button class="btn btn-sm" data-retry>${icon("refresh", 12)} Try again</button></div>
+        </div>
+      </div>`;
+    box.querySelector("[data-retry]").onclick = async () => {
+      const b = box.querySelector("[data-retry]");
+      b.disabled = true;
+      const p = this.thinkingEl("Trying again…");
+      this.col.appendChild(p);
+      this.scrollToBottom(true);
+      try {
+        const r = await api(`/api/conversations/${convId}/retry`, { body: {} });
+        p.remove();
+        const el = this.renderMessage({ ...r, id: r.message_id, role: "assistant",
+          created_at: Math.floor(Date.now() / 1000) });
+        this.col.appendChild(el);
+        if (r.suggestion) this.addSuggestion(el, r.suggestion);
+        this.markLastRegenerable();
+        this.scrollToBottom(true);
+      } catch (e2) {
+        p.remove();
+        const card = box.querySelector(".msg-error-card");
+        card.innerHTML = `Something went wrong while processing your request.
+          <span class="small" style="opacity:.75"> · ${esc(e2.message)}</span>
+          <div class="row"><button class="btn btn-sm" data-retry2>${icon("refresh", 12)} Try again</button></div>`;
+        card.querySelector("[data-retry2]").onclick = box.querySelector("[data-retry]").onclick;
+      }
+    };
+    return box;
+  },
+
+  async regenerate(m) {
+    const pending = this.thinkingEl("Regenerating…");
+    this.col.appendChild(pending);
+    this.scrollToBottom(true);
+    try {
+      const r = await api(`/api/messages/${m.id}/regenerate`, { body: {} });
+      pending.remove();
+      const el = this.renderMessage({ ...r, id: r.message_id, role: "assistant",
+        created_at: Math.floor(Date.now() / 1000) });
+      const oldEl = this.col.querySelector(`.msg[data-id="${m.id}"]`);
+      if (oldEl) oldEl.replaceWith(el); else this.col.appendChild(el);
+      if (r.suggestion) this.addSuggestion(el, r.suggestion);
+      this.markLastRegenerable();
+      this.scrollToBottom(true);
+    } catch (e) {
+      pending.remove();
+      toast(e.message, "err");
+      this.selectConv(this.current);
+    }
+  },
+
+  addSuggestion(msgEl, sug) {
+    const div = document.createElement("div");
+    div.className = "suggestion-chip";
+    div.innerHTML = `
+      <div class="q">Suggested memory — not saved yet</div>
+      <div class="txt">“${esc(sug.content)}”</div>
+      <div class="row">
+        <button class="btn btn-sm btn-primary" data-s="approve">Save to long-term memory</button>
+        <button class="btn btn-sm" data-s="reject">Dismiss</button>
+      </div>`;
+    div.querySelector('[data-s=approve]').onclick = async () => {
+      try {
+        await api(`/api/memories/suggestions/${sug.id}/approve`, { body: {} });
+        div.innerHTML = `<div class="q" style="color:var(--ok)">${icon("check", 12)} Saved to long-term memory</div>`;
+        toast("Memory saved. I'll use it in all future conversations.", "ok");
+      } catch (e) { toast(e.message, "err"); }
+    };
+    div.querySelector('[data-s=reject]').onclick = async () => {
+      try {
+        await api(`/api/memories/suggestions/${sug.id}/reject`, { body: {} });
+        div.remove();
+      } catch (e) { toast(e.message, "err"); }
+    };
+    msgEl.querySelector(".msg-body").appendChild(div);
   },
 
   async sendFeedback(m, rating) {
@@ -261,178 +517,26 @@ const Chat = {
     try {
       await api(`/api/messages/${m.id}/feedback`, { body: { rating, note, corrected_answer: corrected } });
       toast(rating === "up" ? "Thanks for the feedback!" : "Thanks — I'll review this in Admin → Feedback.", "ok");
-      $$(".msg-actions button", $(`.msg[data-id="${m.id}"]`)).forEach(b => b.classList.remove("on"));
-      $(`.msg[data-id="${m.id}"] .msg-actions [data-mact=${rating === "issue" ? "issue" : rating}]`).classList.add("on");
+      const msgEl = $(`#msg-col .msg[data-id="${m.id}"]`);
+      if (msgEl) {
+        $$(".msg-actions button", msgEl).forEach(b => b.classList.remove("on"));
+        const target = msgEl.querySelector(`.msg-actions [data-mact="${rating}"]`);
+        if (target) target.classList.add("on");
+      }
     } catch (e) { toast(e.message, "err"); }
   },
 
-  async regenerate(m) {
-    const box = document.createElement("div");
-    box.innerHTML = `<div class="msg ai"><div class="avatar">✦</div><div class="msg-body">
-      <div class="msg-text"><div class="typing"><i></i><i></i><i></i></div></div>
-      <div class="pending-label">Regenerating…</div></div></div>`;
-    $("#messages").appendChild(box.firstChild);
-    this._scroll();
-    try {
-      const r = await api(`/api/messages/${m.id}/regenerate`, { body: {} });
-      box.remove();
-      const el = this.renderMessage({ ...r, role: "assistant", created_at: Math.floor(Date.now() / 1000) });
-      $("#messages").appendChild(el);
-      if (r.suggestion) this.addSuggestion(el, r.suggestion);
-      this._scroll();
-    } catch (e) {
-      box.remove();
-      toast(e.message, "err");
-      this.selectConv(this.current);
-    }
-  },
-
-  addSuggestion(msgEl, sug) {
-    const div = document.createElement("div");
-    div.className = "suggestion-chip";
-    div.innerHTML = `
-      <div class="q">💾 Suggested memory (not saved yet)</div>
-      <div class="txt">“${esc(sug.content)}”</div>
-      <div class="row">
-        <button class="btn btn-sm btn-primary" data-s="approve">Save to long-term memory</button>
-        <button class="btn btn-sm" data-s="reject">Dismiss</button>
-      </div>`;
-    div.querySelector('[data-s=approve]').onclick = async () => {
-      try {
-        await api(`/api/memories/suggestions/${sug.id}/approve`, { body: {} });
-        div.innerHTML = `<div class="q" style="color:var(--ok)">✓ Saved to long-term memory</div>`;
-        toast("Memory saved. I'll use it in all future conversations.", "ok");
-      } catch (e) { toast(e.message, "err"); }
-    };
-    div.querySelector('[data-s=reject]').onclick = async () => {
-      try {
-        await api(`/api/memories/suggestions/${sug.id}/reject`, { body: {} });
-        div.remove();
-      } catch (e) { toast(e.message, "err"); }
-    };
-    msgEl.querySelector(".msg-body").appendChild(div);
-  },
-
-  renderAttachments() {
-    const row = $("#attach-row");
-    row.innerHTML = "";
-    this.files.forEach((f, i) => {
-      const el = document.createElement("span");
-      el.className = "attach";
-      el.innerHTML = `📄 ${esc(f.name)} <b>${fmtBytes(f.size)}</b> <button data-i="${i}" title="Remove">✕</button>`;
-      el.querySelector("button").onclick = () => { this.files.splice(i, 1); this.renderAttachments(); };
-      row.appendChild(el);
-    });
-  },
-
-  _pendingEl(label) {
-    const box = document.createElement("div");
-    box.innerHTML = `<div class="msg ai"><div class="avatar">✦</div><div class="msg-body">
-      <div class="msg-text"><div class="typing"><i></i><i></i><i></i></div></div>
-      <div class="pending-label">${esc(label)}</div></div></div>`;
-    return box.firstElementChild;
-  },
-
-  _scroll() {
-    const el = $("#messages");
-    el.scrollTop = el.scrollHeight;
-  },
-
-  async send() {
-    if (this.busy) return;
-    const input = $("#chat-input");
-    const text = input.value.trim();
-    if (!text && !this.files.length) return;
-    if (!this.current) await this.newChat(true);
-    const convId = this.current;
-    const isTraining = this.files.length === 0 && (
-      (this.convs.find(c => c.id === convId) || {}).title || "").startsWith("🎓");
-
-    // optimistic user message
-    const msgsEl = $("#messages");
-    if (msgsEl.classList.contains("empty-state")) {
-      msgsEl.classList.remove("empty-state");
-      msgsEl.innerHTML = "";
-    }
-    msgsEl.appendChild(this.renderMessage({
-      id: "tmp-" + Date.now(), role: "user",
-      content: text || (this.files.map(f => `📎 ${f.name}`).join("\n")),
-      training: isTraining, created_at: Math.floor(Date.now() / 1000),
-    }));
-    input.value = "";
-    input.style.height = "auto";
-    this._scroll();
-
-    const pending = this._pendingEl("Thinking…");
-    msgsEl.appendChild(pending);
-    this.busy = true;
-    $("#send-btn").disabled = true;
-    const started = Date.now();
-    const tick = setInterval(() => {
-      const lbl = pending.querySelector(".pending-label");
-      if (lbl) lbl.textContent = `Thinking… ${Math.floor((Date.now() - started) / 1000)}s`;
-    }, 1000);
-
-    const fd = new FormData();
-    fd.append("content", text);
-    fd.append("training", isTraining ? "true" : "false");
-    this.files.forEach(f => fd.append("files", f));
-
-    try {
-      const r = await api(`/api/conversations/${convId}/messages`, { body: fd });
-      clearInterval(tick);
-      pending.remove();
-      const el = this.renderMessage({ ...r, role: "assistant", created_at: Math.floor(Date.now() / 1000) });
-      msgsEl.appendChild(el);
-      if (r.suggestion) this.addSuggestion(el, r.suggestion);
-      this.markLastRegenerable();
-      this.files = [];
-      this.renderAttachments();
-      this._scroll();
-      await this.loadConvs();
-    } catch (e) {
-      clearInterval(tick);
-      pending.remove();
-      const errBox = document.createElement("div");
-      errBox.className = "msg ai";
-      errBox.innerHTML = `<div class="avatar">✦</div><div class="msg-body">
-        <div class="msg-error-card">⚠ ${esc(e.message)}
-          <div class="row"><button class="btn btn-sm" data-retry>↻ Try again</button></div>
-        </div></div>`;
-      msgsEl.appendChild(errBox);
-      const retryBtn = errBox.querySelector("[data-retry]");
-      retryBtn.onclick = async () => {
-        retryBtn.disabled = true;
-        const p = this._pendingEl("Trying again…");
-        msgsEl.appendChild(p);
-        this._scroll();
-        try {
-          const r = await api(`/api/conversations/${convId}/retry`, { body: {} });
-          p.remove();
-          const el2 = this.renderMessage({ ...r, role: "assistant", created_at: Math.floor(Date.now() / 1000) });
-          msgsEl.appendChild(el2);
-          if (r.suggestion) this.addSuggestion(el2, r.suggestion);
-          this.markLastRegenerable();
-          this._scroll();
-        } catch (e2) {
-          p.remove();
-          errBox.querySelector(".msg-error-card").firstChild.textContent = "⚠ " + e2.message + " ";
-        }
-      };
-      this.files = [];
-      this.renderAttachments();
-      this._scroll();
-    }
-    this.busy = false;
-    $("#send-btn").disabled = false;
-  },
+  /* ---------- conversation management ---------- */
 
   async renameConv(id) {
+    const conv = this.convs.find(c => c.id === id);
     const body = document.createElement("div");
-    body.innerHTML = `<label class="field"><span>Conversation title</span><input id="cnv-title" type="text" maxlength="120"></label>`;
+    body.innerHTML = `<label class="field"><span>Conversation title</span>
+      <input id="cnv-title" type="text" maxlength="120" value="${esc(conv ? conv.title : "")}"></label>`;
+    let title = "";
     const val = await modal({ title: "Rename conversation", body,
-      actions: [{ label: "Cancel" }, { label: "Save", cls: "btn-primary", onClick: () => {} }] });
-    const title = $("#cnv-title").value.trim();
+      actions: [{ label: "Cancel" }, { label: "Save", cls: "btn-primary",
+        onClick: () => { title = $("#cnv-title").value.trim(); } }] });
     if (val === "Save" && title) {
       try {
         await api(`/api/conversations/${id}`, { method: "PATCH", body: { title } });
@@ -466,15 +570,8 @@ const Chat = {
         if (this.convs.length) this.selectConv(this.convs[0].id);
         else this.newChat();
       }
-      this.refreshConvList();
+      Sidebar.refresh();
       toast("Conversation deleted.", "ok");
     } catch (e) { toast(e.message, "err"); }
-  },
-
-  toggleDrawer(force) {
-    const d = $("#conv-drawer"), b = $("#conv-backdrop");
-    const open = force !== undefined ? force : !d.classList.contains("open");
-    d.classList.toggle("open", open);
-    b.classList.toggle("open", open);
-  },
+  }
 };
