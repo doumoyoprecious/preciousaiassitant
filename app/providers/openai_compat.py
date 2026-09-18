@@ -63,17 +63,18 @@ class OpenAICompat(LLMProvider):
             raise LLMError(f"Could not reach the {self.name} API (network error). "
                            "Check your connection and try again.", "network") from e
 
+        err_body = r.text[:300] if r.status_code >= 400 else None
         if r.status_code == 401:
             raise LLMError(f"The {self.name} API rejected the API key (401). "
-                           "Check it in Admin → API Settings.", "auth")
+                           "Check it in Admin → API Settings.", "auth", detail=err_body)
         if r.status_code == 429:
             raise LLMError(f"The {self.name} rate limit was hit (429). Wait a moment and retry.", "rate_limit")
         if r.status_code >= 500:
             raise LLMError(f"The {self.name} service returned a server error ({r.status_code}). "
-                           "Try again in a moment.", "provider")
+                           "Try again in a moment.", "provider", detail=err_body)
         if r.status_code != 200:
             raise LLMError(f"The {self.name} API returned an error (HTTP {r.status_code}). "
-                           "Please try again.", "provider")
+                           "Please try again.", "provider", detail=err_body)
         try:
             data = r.json()
         except ValueError:

@@ -28,7 +28,10 @@ async def http_error_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(LLMError)
 async def llm_error_handler(request: Request, exc: LLMError):
-    db.log_error("llm", exc.message, level="warn", detail=f"code={exc.code} path={request.url.path}")
+    detail = f"code={exc.code} path={request.url.path}"
+    if getattr(exc, "detail", None):
+        detail += f" | provider said: {exc.detail}"
+    db.log_error("llm", exc.message, level="warn", detail=detail)
     return JSONResponse(status_code=400, content={"error": exc.message})
 
 

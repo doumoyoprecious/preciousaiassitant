@@ -9,11 +9,16 @@ from dataclasses import dataclass, field
 
 
 class LLMError(Exception):
-    """Error with a user-safe message. Never contains stack traces or secrets."""
+    """Error with a user-safe message. Never contains stack traces or secrets.
 
-    def __init__(self, message, code=None):
+    `detail` is optional raw technical context — logged server-side only,
+    never sent to the client.
+    """
+
+    def __init__(self, message, code=None, detail=None):
         self.message = message
         self.code = code
+        self.detail = detail
         super().__init__(message)
 
 

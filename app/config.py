@@ -49,10 +49,11 @@ PROVIDERS = ["groq", "openai", "anthropic", "gemini", "openrouter", "ollama"]
 
 MODEL_CATALOG = {
     "groq": [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768",
-        "gemma2-9b-it",
+        "openai/gpt-oss-120b",
+        "qwen/qwen3.8-27b",
+        "groq/compound",
+        "groq/compound-mini",
+        "openai/gpt-oss-20b",
     ],
     "openai": ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4o"],
     "anthropic": ["claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-1"],
@@ -67,7 +68,7 @@ MODEL_CATALOG = {
 
 DEFAULT_SETTINGS = {
     "provider": "groq",
-    "model": "llama-3.3-70b-versatile",
+    "model": "openai/gpt-oss-120b",
     "temperature": "0.4",
     "max_tokens": "1200",
     "rag_top_k": "4",
@@ -150,7 +151,7 @@ TOOL_SEEDS = [
         "Get the current date and time.",
         json.dumps({
             "type": "object",
-            "properties": {"timezone": {"type": "string", "description": "IANA timezone name (default: Africa/Lagos)"}},
+            "properties": {"timezone": {"type": ["string", "null"], "description": "IANA timezone name; omit or null for the default (Africa/Lagos)"}},
         }),
         1, 1,
     ),
@@ -162,7 +163,7 @@ TOOL_SEEDS = [
             "type": "object",
             "properties": {
                 "query": {"type": "string"},
-                "category": {"type": "string", "description": "Optional category filter"},
+                "category": {"type": ["string", "null"], "description": "Optional category filter; omit or null for all categories"},
             },
             "required": ["query"],
         }),
@@ -171,7 +172,7 @@ TOOL_SEEDS = [
     (
         "list_knowledge_documents",
         "List the documents stored in the knowledge base, optionally filtered by category.",
-        json.dumps({"type": "object", "properties": {"category": {"type": "string"}}}),
+        json.dumps({"type": "object", "properties": {"category": {"type": ["string", "null"], "description": "Optional category filter; null for all"}}}),
         1, 1,
     ),
     # Planned (Phase 7 / future modules) — visible in Admin, not active.

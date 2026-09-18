@@ -53,6 +53,7 @@ def run_case(case: dict) -> dict:
         sources = result["sources"]
     except LLMError as e:
         error = e.message
+        db.log_error("eval", e.message, level="warn", detail=getattr(e, "detail", None))
 
     phrases = _split_phrases(case.get("expected_info") or "")
     hits = []

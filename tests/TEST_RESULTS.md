@@ -1,12 +1,12 @@
 # Precious AI — Workflow Test Report
 
-- Run at: 2026-09-18T11:29:15
+- Run at: 2026-09-18T12:55:39
 - Target: http://127.0.0.1:8000
 - Embedder: sentence-transformers/all-MiniLM-L6-v2 (local ONNX, free)
-- Provider/model: groq / llama-3.3-70b-versatile
-- Live API key configured at run time: no
+- Provider/model: groq / openai/gpt-oss-120b
+- Live API key configured at run time: yes
 
-## Passed (87)
+## Passed (86)
 - [x] health endpoint
 - [x] owner setup creates account
 - [x] setup sets session cookie
@@ -20,9 +20,8 @@
 - [x] delete conversation
 - [x] conversation list (eval convs hidden)
 - [x] search conversations
-- [x] no-key chat returns friendly error (400, no stack trace)
-- [x] retry endpoint exists (also friendly without key)
-- [x] retry endpoint responds gracefully
+- [x] live chat returns an answer
+- [x] chat response has model field
 - [x] empty message rejected
 - [x] upload txt document
 - [x] RAG search finds the document
@@ -58,7 +57,7 @@
 - [x] admin can review feedback
 - [x] create eval case
 - [x] run eval case (graceful without key)
-- [x] eval records error gracefully (no live call made)
+- [x] eval produced an answer
 - [x] list eval cases
 - [x] update eval case
 - [x] instruction versions listed
@@ -95,12 +94,9 @@
 - [x] /js/chat.js served
 - [x] /js/admin.js served
 
-## Pending API configuration (3)
+## Pending API configuration (0)
 These require a live provider key (GROQ_API_KEY via Admin → API Keys or the
 server-side environment variable). They are **not** mocked or faked.
-- [ ] live chat returns an answer — Pending API configuration — no live provider key set
-- [ ] chat response has model field — Pending API configuration — no live provider key set
-- [ ] eval produces a live scored answer (auto-scoring vs. model output) — Pending API configuration — no live provider key set
 
 ## Failed (0)
 - (none)

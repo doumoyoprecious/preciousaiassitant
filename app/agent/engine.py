@@ -250,7 +250,7 @@ def run_turn(conv_id: str, user_text: str, files=None, training: bool = False) -
                  detail={"model": result.model or model, "provider": provider_name,
                          "tokens_in": result.tokens_in, "tokens_out": result.tokens_out,
                          "latency_ms": latency_ms, "rag_results": len(retrieval),
-                         "tools": [c.name for m in all_msgs if m["role"] == "assistant"
+                         "tools": [c["name"] for m in all_msgs if m["role"] == "assistant"
                                    for c in (m.get("tool_calls") or [])]})
 
     return {
