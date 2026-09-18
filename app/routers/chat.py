@@ -1,7 +1,7 @@
 """Chat: conversations, messages, feedback, regenerate."""
 import re
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from .. import auth, db
@@ -120,6 +120,7 @@ def clear_conversation(conv_id: str, user=Depends(auth.require_user)):
 
 @router.post("/conversations/{conv_id}/messages")
 async def send_message(
+    request: Request,
     conv_id: str,
     content: str = Form(default=""),
     training: str = Form(default="false"),
@@ -127,6 +128,7 @@ async def send_message(
     user=Depends(auth.require_user),
 ):
     _conv(conv_id)
+    auth.check_rate(request, "llm", 30, 60)  # 30 LLM calls/min/session — protects provider budget
     content = (content or "").strip()
     uploaded = []
     for f in files[:MAX_FILES]:
@@ -151,8 +153,9 @@ async def send_message(
 
 
 @router.post("/conversations/{conv_id}/retry")
-def retry(conv_id: str, user=Depends(auth.require_user)):
+def retry(request: Request, conv_id: str, user=Depends(auth.require_user)):
     _conv(conv_id)
+    auth.check_rate(request, "llm", 30, 60)
     try:
         return engine.retry_last(conv_id)
     except LLMError as e:
@@ -160,10 +163,11 @@ def retry(conv_id: str, user=Depends(auth.require_user)):
 
 
 @router.post("/messages/{message_id}/regenerate")
-def regenerate(message_id: str, user=Depends(auth.require_user)):
+def regenerate(request: Request, message_id: str, user=Depends(auth.require_user)):
     msg = db.query_one("SELECT * FROM messages WHERE id=?", (message_id,))
     if not msg:
         raise HTTPException(404, "Message not found.")
+    auth.check_rate(request, "llm", 30, 60)
     try:
         return engine.regenerate(msg["conv_id"], message_id)
     except LLMError as e:

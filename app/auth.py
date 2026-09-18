@@ -83,3 +83,26 @@ def rate_limit_login(request: Request):
     if count >= 8:
         raise HTTPException(status_code=429, detail="Too many login attempts. Wait a minute and try again.")
     _attempts[ip] = (bucket, count + 1)
+
+
+# ---------- sliding-window rate limits for expensive endpoints ----------
+# Keyed by session (authenticated) or IP, per scope. Protects the provider
+# budget (e.g. Groq free tier) and blocks automated abuse.
+
+_rl = {}
+
+
+def check_rate(request: Request, scope: str, limit: int, window: int = 60):
+    key = request.cookies.get("pa_session") or (request.client.host if request.client else "unknown")
+    now = time.time()
+    floor = now - window
+    rec = _rl.get(scope + "\x00" + key)
+    stamps = [t for t in rec if t > floor] if rec else []
+    if len(stamps) >= limit:
+        raise HTTPException(status_code=429,
+                            detail="Rate limit reached — please wait a minute and try again.")
+    stamps.append(now)
+    _rl[scope + "\x00" + key] = stamps
+    if len(_rl) > 10000:  # opportunistic cleanup of stale entries
+        for k in [k for k, ts in _rl.items() if not ts or ts[-1] < floor]:
+            _rl.pop(k, None)

@@ -1,5 +1,5 @@
 """Evaluation / testing API."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from .. import auth, db
@@ -57,7 +57,8 @@ class RunIn(BaseModel):
 
 
 @router.post("/run")
-def run(body: RunIn, user=Depends(auth.require_owner)):
+def run(request: Request, body: RunIn, user=Depends(auth.require_owner)):
+    auth.check_rate(request, "llm", 30, 60)
     if body.case_id:
         case = db.query_one("SELECT * FROM eval_cases WHERE id=?", (body.case_id,))
         if not case:

@@ -1,8 +1,10 @@
 """Precious AI — application entry point."""
 import logging
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -15,6 +17,44 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 log = logging.getLogger("precious")
 
 app = FastAPI(title="Precious AI", version="1.0.0")
+
+# ---------- security headers (production checklist) ----------
+
+CSP = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "frame-ancestors 'none'; "
+    "form-action 'self'"
+)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("Content-Security-Policy", CSP)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("X-XSS-Protection", "0")
+    if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+
+
+# ---------- CORS for split hosting (Vercel UI -> API server) ----------
+# Same-origin deployments need nothing; set PA_CORS_ORIGINS="https://app.vercel.app"
+# when the frontend is hosted separately.
+
+_cors_origins = [o.strip() for o in os.environ.get("PA_CORS_ORIGINS", "").split(",") if o.strip()]
+if _cors_origins:
+    app.add_middleware(CORSMiddleware, allow_origins=_cors_origins,
+                       allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 
 # ---------- error handling: never expose raw technical errors ----------

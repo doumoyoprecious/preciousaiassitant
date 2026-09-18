@@ -4,9 +4,18 @@
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+/* Base URL for the API. "" = same origin; set window.PA_API in config.js
+ * for split hosting (UI and API on different hosts). */
+const PA_BASE = (window.PA_API || "").replace(/\/+$/, "");
+
 async function api(path, opts = {}) {
+  const url = PA_BASE + path;
+  const sameOrigin = PA_BASE === "";
   const init = { method: opts.method || (opts.body ? "POST" : "GET"),
-    headers: opts.headers || {}, credentials: "same-origin" };
+    headers: opts.headers || {},
+    /* "include" is needed for cross-origin session cookies (split hosting);
+       "same-origin" is sufficient and stricter when the API is co-located. */
+    credentials: sameOrigin ? "same-origin" : "include" };
   if (opts.body && !(opts.body instanceof FormData)) {
     init.headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(opts.body);
@@ -15,9 +24,10 @@ async function api(path, opts = {}) {
   }
   let res;
   try {
-    res = await fetch(path, init);
+    res = await fetch(url, init);
   } catch (e) {
-    throw new Error("Network error — check your connection and try again.");
+    if (sameOrigin) throw new Error("Network error — check your connection and try again.");
+    throw new Error("Cannot reach the AI server — check that it's running and PA_API in config.js points to it.");
   }
   let data = null;
   try { data = await res.json(); } catch (e) { /* non-json */ }

@@ -1,5 +1,5 @@
 """Knowledge base API (owner)."""
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
 from .. import auth, config
@@ -51,8 +51,9 @@ def search(q: str = "", category: str = None, limit: int = 10, user=Depends(auth
 
 
 @router.post("/upload")
-async def upload(file: UploadFile = File(...), category: str = Form(default="General Knowledge"),
+async def upload(request: Request, file: UploadFile = File(...), category: str = Form(default="General Knowledge"),
                  user=Depends(auth.require_owner)):
+    auth.check_rate(request, "kb_write", 10, 60)
     data = await file.read()
     try:
         return kb.add_file(file.filename, data, category)
@@ -61,7 +62,8 @@ async def upload(file: UploadFile = File(...), category: str = Form(default="Gen
 
 
 @router.post("/manual")
-def manual(body: ManualIn, user=Depends(auth.require_owner)):
+def manual(request: Request, body: ManualIn, user=Depends(auth.require_owner)):
+    auth.check_rate(request, "kb_write", 10, 60)
     try:
         return kb.add_manual(body.title, body.content, body.category, body.kind)
     except LLMError as e:
@@ -69,7 +71,8 @@ def manual(body: ManualIn, user=Depends(auth.require_owner)):
 
 
 @router.post("/url")
-def add_url(body: UrlIn, user=Depends(auth.require_owner)):
+def add_url(request: Request, body: UrlIn, user=Depends(auth.require_owner)):
+    auth.check_rate(request, "kb_write", 10, 60)
     try:
         return kb.add_url(body.url, body.category, body.title)
     except LLMError as e:
@@ -79,7 +82,8 @@ def add_url(body: UrlIn, user=Depends(auth.require_owner)):
 
 
 @router.post("/{doc_id}/replace")
-async def replace(doc_id: str, file: UploadFile = File(...), user=Depends(auth.require_owner)):
+async def replace(request: Request, doc_id: str, file: UploadFile = File(...), user=Depends(auth.require_owner)):
+    auth.check_rate(request, "kb_write", 10, 60)
     data = await file.read()
     try:
         return kb.replace(doc_id, file.filename, data)
