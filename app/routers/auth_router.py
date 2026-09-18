@@ -37,10 +37,12 @@ def setup(body: SetupIn, request: Request, response: Response):
     username = body.username.strip().lower()
     if not re.match(r"^[a-z0-9_\-\.]{2,32}$", username):
         raise HTTPException(400, "Username must be 2-32 characters (letters, numbers, _ - .).")
-    cur = db.execute(
+    db.execute(
         "INSERT INTO owner(username, pass_hash, role, created_at) VALUES(?,?,?,?)",
         (username, auth.hash_password(body.password), "owner", db.now()))
-    token = auth.create_session(cur.lastrowid)
+    # portable across backends (no cursor.lastrowid)
+    owner_id = db.query_one("SELECT id FROM owner WHERE username=?", (username,))["id"]
+    token = auth.create_session(owner_id)
     auth.set_cookie(response, request, token)
     db.log_event("setup", detail={"username": username})
     return {"username": username, "role": "owner"}

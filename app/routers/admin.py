@@ -298,7 +298,7 @@ def modules(user=Depends(auth.require_owner)):
 @router.get("/data/export")
 def data_export(user=Depends(auth.require_owner)):
     """Export user data. Secrets (API keys, session tokens, password hashes) are never exported."""
-    tables = {t["name"] for t in db.query("SELECT name FROM sqlite_master WHERE type='table'")}
+    tables = set(db.list_tables())
     export = {"app": "precious-ai", "exported_at": int(time.time()), "data": {}}
     for t in sorted(tables):
         if t.startswith("sqlite_"):

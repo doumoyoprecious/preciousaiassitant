@@ -33,6 +33,10 @@ class Embedder:
             if self._model is not None or self._failed is not None:
                 return
             try:
+                # Model cache must live on a writable path. On Vercel that is
+                # /tmp/precious-ai/models (config.MODELS_DIR); the model is
+                # re-downloaded on each cold instance (a few seconds).
+                config.ensure_dirs()
                 from fastembed import TextEmbedding
                 self._model = TextEmbedding(MODEL_NAME, cache_dir=str(config.MODELS_DIR))
             except Exception as e:  # noqa: BLE001

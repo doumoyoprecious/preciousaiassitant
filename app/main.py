@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import db
+from . import config, db
 from .providers.base import LLMError
 from .rag import embedder
 from .routers import admin, auth_router, chat, eval_router, knowledge, memory, training
@@ -96,23 +96,46 @@ app.include_router(admin.router)
 app.include_router(eval_router.router)
 
 
+def _storage_info() -> dict:
+    """Storage backend status — safe to expose (never includes credentials)."""
+    try:
+        p = db.provider()
+        p.init()
+        info = p.describe()
+    except Exception as e:
+        info = {"kind": os.environ.get("PA_STORAGE", "sqlite"),
+                "error": f"{e.__class__.__name__}: {str(e)[:300]}"}
+    if not config.DATA_DIR_WRITABLE:
+        info["data_dir_writable"] = False
+        info["data_dir_warning"] = "Runtime data directory is not writable."
+    return info
+
+
 @app.get("/api/health")
 def health():
-    owner = db.query_one("SELECT username FROM owner LIMIT 1")
-    settings = db.all_settings()
-    from .providers import registry
-    key = registry.resolve_api_key(settings.get("provider", "groq"))
-    return {
-        "ok": True,
-        "owner_configured": bool(owner),
-        "provider": settings.get("provider"),
-        "model": settings.get("model"),
-        "api_key_configured": bool(key),
-        "embedder": embedder.backend(),
-        "embedder_state": embedder.state(),
-        "kb_chunks": db.query_one("SELECT COUNT(*) n FROM chunks")["n"],
-        "kb_documents": db.query_one("SELECT COUNT(*) n FROM documents WHERE status='ready'")["n"],
-    }
+    """Liveness + storage status. Always HTTP 200; check the 'ok' field.
+    Uptime checks should assert `ok == true` in the body, not just 200."""
+    out = {"ok": False}
+    try:
+        owner = db.query_one("SELECT username FROM owner LIMIT 1")
+        settings = db.all_settings()
+        from .providers import registry
+        key = registry.resolve_api_key(settings.get("provider", "groq"))
+        out.update({
+            "ok": True,
+            "owner_configured": bool(owner),
+            "provider": settings.get("provider"),
+            "model": settings.get("model"),
+            "api_key_configured": bool(key),
+            "embedder": embedder.backend(),
+            "embedder_state": embedder.state(),
+            "kb_chunks": db.query_one("SELECT COUNT(*) n FROM chunks")["n"],
+            "kb_documents": db.query_one("SELECT COUNT(*) n FROM documents WHERE status='ready'")["n"],
+        })
+    except Exception as e:
+        out["error"] = f"{e.__class__.__name__}: {str(e)[:300]}"
+    out["storage"] = _storage_info()
+    return out
 
 
 # ---------- static frontend ----------

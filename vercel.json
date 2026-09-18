@@ -1,0 +1,6 @@
+{
+  "$comment": "Precious AI — Vercel serverless (FastAPI) project config. For this mode the project root is the REPO ROOT (Vercel detects FastAPI). If you instead deploy only the static UI, import with root directory 'web' (web/vercel.json applies instead).",
+  "functions": {
+    "**/*": { "maxDuration": 60 }
+  }
+}

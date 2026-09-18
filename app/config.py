@@ -1,16 +1,65 @@
 """Application configuration, paths, defaults and catalogs."""
-import os
 import json
+import logging
+import os
 from pathlib import Path
 
+log = logging.getLogger("precious.config")
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
+
+# ---------- runtime storage location ----------
+# Vercel serverless functions have a READ-ONLY application filesystem
+# (/var/task); the only writable scratch space is /tmp. Therefore:
+#   * PA_DATA_DIR env var              -> explicit override (any environment)
+#   * serverless (VERCEL / AWS Lambda) -> /tmp/precious-ai   (EPHEMERAL!)
+#   * anywhere else (dev box, API VPS) -> <project>/data     (persistent disk)
+IS_SERVERLESS = bool(os.environ.get("VERCEL")) or bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+
+
+def _default_data_dir() -> Path:
+    if IS_SERVERLESS:
+        return Path(os.environ.get("PA_TMP_ROOT", "/tmp/precious-ai"))
+    return BASE_DIR / "data"
+
+
+DATA_DIR = Path(os.environ.get("PA_DATA_DIR") or _default_data_dir()).resolve()
 UPLOADS_DIR = DATA_DIR / "uploads"
-MODELS_DIR = DATA_DIR / "models"
+MODELS_DIR = Path(os.environ.get("PA_MODEL_CACHE_DIR") or (DATA_DIR / "models")).resolve()
 DB_PATH = DATA_DIR / "precious.db"
 
-for _d in (DATA_DIR, UPLOADS_DIR, MODELS_DIR):
-    _d.mkdir(parents=True, exist_ok=True)
+# ---------- persistent storage backend ----------
+# PA_STORAGE=sqlite   (default) -> file database at DB_PATH
+# PA_STORAGE=postgres           -> external Postgres via PA_DATABASE_URL
+#                                  (Neon / Supabase / Railway / RDS / ...)
+# On Vercel, a sqlite file in /tmp is EPHEMERAL: it vanishes every time the
+# function instance is recycled. For durable data on Vercel use postgres.
+STORAGE = os.environ.get("PA_STORAGE", "sqlite").strip().lower()
+DATABASE_URL = os.environ.get("PA_DATABASE_URL", "")
+
+DATA_DIR_WRITABLE = True
+
+
+def ensure_dirs() -> None:
+    """Create runtime directories with proper error handling.
+
+    Never raises: if a directory cannot be created (read-only filesystem),
+    the app keeps running read-only and the problem is surfaced via
+    /api/health. On Vercel this only ever writes under /tmp.
+    """
+    global DATA_DIR_WRITABLE
+    for d in (DATA_DIR, UPLOADS_DIR, MODELS_DIR):
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            probe = d / f".wtest-{os.getpid()}"
+            probe.touch()
+            probe.unlink(missing_ok=True)
+        except OSError as e:
+            DATA_DIR_WRITABLE = False
+            log.error("Runtime storage dir %s is not writable: %s", d, e)
+
+
+ensure_dirs()
 
 
 def _load_dotenv():
