@@ -1,0 +1,20 @@
+# ---- Secrets: NEVER commit ----
+.env
+
+# ---- Runtime data: regenerated automatically on startup ----
+# SQLite database (contains owner credentials & API keys — server-side only)
+data/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/

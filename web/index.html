@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e14">
+<title>Precious AI</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<!-- ======= AUTH ======= -->
+<div id="auth-screen" class="auth-screen hidden">
+  <div class="auth-card">
+    <div class="auth-logo">✦</div>
+    <h1>Precious AI</h1>
+    <p class="auth-sub" id="auth-sub">Your personal AI agent — set up your owner account</p>
+    <form id="auth-form" autocomplete="off">
+      <label class="field">
+        <span>Username</span>
+        <input id="auth-username" type="text" autocomplete="username" placeholder="owner" required>
+      </label>
+      <label class="field">
+        <span>Password (min 8 characters)</span>
+        <input id="auth-password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+      </label>
+      <button type="submit" class="btn btn-primary btn-block" id="auth-submit">Create owner account</button>
+      <div id="auth-error" class="form-error"></div>
+    </form>
+    <p class="auth-note">Owner access controls the entire agent. This account is required to use Precious AI.</p>
+  </div>
+</div>
+
+<!-- ======= APP ======= -->
+<div id="app" class="hidden">
+  <aside id="sidebar">
+    <div class="brand"><span class="brand-mark">✦</span><span>Precious AI</span></div>
+    <nav class="side-nav">
+      <button data-view="chat" class="active">Chat</button>
+      <button data-view="knowledge">Knowledge</button>
+      <button data-view="memory">Memory</button>
+      <button data-view="training">Learn</button>
+      <button data-view="admin">Admin</button>
+    </nav>
+    <div class="side-foot">
+      <div id="provider-chip" class="chip" title="Active model">…</div>
+      <button id="logout-btn" class="btn btn-ghost btn-sm">Log out</button>
+    </div>
+  </aside>
+
+  <main id="main">
+    <header id="topbar">
+      <button id="burger" class="icon-btn" title="Conversations">☰</button>
+      <div id="view-title">Chat</div>
+      <div id="topbar-actions"></div>
+    </header>
+    <div id="view-root"></div>
+  </main>
+
+  <nav id="bottomnav">
+    <button data-view="chat" class="active">Chat</button>
+    <button data-view="knowledge">Knowledge</button>
+    <button data-view="memory">Memory</button>
+    <button data-view="training">Learn</button>
+    <button data-view="admin">Admin</button>
+  </nav>
+</div>
+
+<div id="toasts"></div>
+<div id="modal-root"></div>
+
+<script src="/js/common.js"></script>
+<script src="/js/chat.js"></script>
+<script src="/js/knowledge.js"></script>
+<script src="/js/memory.js"></script>
+<script src="/js/training.js"></script>
+<script src="/js/admin.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

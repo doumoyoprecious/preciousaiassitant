@@ -1,0 +1,106 @@
+# Precious AI — Workflow Test Report
+
+- Run at: 2026-09-18T11:29:15
+- Target: http://127.0.0.1:8000
+- Embedder: sentence-transformers/all-MiniLM-L6-v2 (local ONNX, free)
+- Provider/model: groq / llama-3.3-70b-versatile
+- Live API key configured at run time: no
+
+## Passed (87)
+- [x] health endpoint
+- [x] owner setup creates account
+- [x] setup sets session cookie
+- [x] admin blocked when unauthenticated (401)
+- [x] chat blocked when unauthenticated (401)
+- [x] wrong password rejected (401)
+- [x] health still public
+- [x] create conversation
+- [x] get conversation
+- [x] rename conversation
+- [x] delete conversation
+- [x] conversation list (eval convs hidden)
+- [x] search conversations
+- [x] no-key chat returns friendly error (400, no stack trace)
+- [x] retry endpoint exists (also friendly without key)
+- [x] retry endpoint responds gracefully
+- [x] empty message rejected
+- [x] upload txt document
+- [x] RAG search finds the document
+- [x] RAG result contains relevant content
+- [x] empty/irrelevant search returns empty results (no crash)
+- [x] unsupported file type rejected with clear message
+- [x] manual knowledge added
+- [x] mark knowledge authoritative
+- [x] outdated flag toggle
+- [x] csv upload indexed
+- [x] add long-term memory
+- [x] view memories
+- [x] search memories
+- [x] edit memory
+- [x] create suggestion (not stored as memory yet)
+- [x] suggestion NOT in memories before approval
+- [x] approve suggestion → becomes memory
+- [x] approved memory now stored
+- [x] reject suggestion
+- [x] delete memory
+- [x] memory deleted
+- [x] teach preference → long-term memory
+- [x] teach FAQ → knowledge base
+- [x] training summary counts
+- [x] replace document
+- [x] replaced doc searchable (Cleo)
+- [x] delete document
+- [x] deleted doc gone
+- [x] categories list
+- [x] user messages stored
+- [x] submit feedback with correction
+- [x] override feedback to helpful
+- [x] admin can review feedback
+- [x] create eval case
+- [x] run eval case (graceful without key)
+- [x] eval records error gracefully (no live call made)
+- [x] list eval cases
+- [x] update eval case
+- [x] instruction versions listed
+- [x] save new instruction version
+- [x] new version is active
+- [x] revert to previous version
+- [x] version reverted active
+- [x] get settings
+- [x] update settings (unknown keys ignored)
+- [x] invalid temperature rejected
+- [x] save API key
+- [x] key stored server-side & masked in responses
+- [x] full key never in API response
+- [x] model catalog available
+- [x] tools registry listed
+- [x] disable tool
+- [x] enable tool
+- [x] planned tool cannot be enabled (honest status)
+- [x] overview analytics
+- [x] error logs accessible
+- [x] modules/roadmap status
+- [x] export works
+- [x] export excludes sessions/owner tables
+- [x] export masks api keys
+- [x] wipe requires typed confirmation
+- [x] wipe memories
+- [x] memories cleared
+- [x] wipe conversations
+- [x] conversations cleared
+- [x] remove test API key
+- [x] index.html served
+- [x] /css/app.css served
+- [x] /js/app.js served
+- [x] /js/chat.js served
+- [x] /js/admin.js served
+
+## Pending API configuration (3)
+These require a live provider key (GROQ_API_KEY via Admin → API Keys or the
+server-side environment variable). They are **not** mocked or faked.
+- [ ] live chat returns an answer — Pending API configuration — no live provider key set
+- [ ] chat response has model field — Pending API configuration — no live provider key set
+- [ ] eval produces a live scored answer (auto-scoring vs. model output) — Pending API configuration — no live provider key set
+
+## Failed (0)
+- (none)
