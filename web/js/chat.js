@@ -25,10 +25,10 @@ const Chat = {
       <div class="chat-stage" id="chat-stage">
         <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Conversation">
           <div class="msg-col" id="msg-col"></div>
+          <button class="jump-latest" id="jump-latest" aria-label="Jump to latest message">
+            ${icon("chevron", 14)} Jump to latest
+          </button>
         </div>
-        <button class="jump-latest" id="jump-latest" aria-label="Jump to latest message">
-          ${icon("chevron", 14)} Jump to latest
-        </button>
         <div class="composer">
           <div class="composer-shell">
             <div class="attach-row" id="attach-row"></div>
@@ -208,10 +208,11 @@ const Chat = {
     }
     this.convs.unshift(conv);
     this.selectConv(conv.id, true);
+    if (this.col) history.replaceState(null, "", "#/chat/" + conv.id); // keep hash in sync, no re-route
   },
 
   async selectConv(id, noScroll) {
-    if (!this.col) return; // chat view not mounted
+    if (!this.col || !this.col.isConnected) return; // chat view not mounted
     this.current = id;
     Sidebar.refresh();
     const conv = this.convs.find(c => c.id === id);
@@ -223,9 +224,11 @@ const Chat = {
       const msgs = await api(`/api/conversations/${id}/messages`);
       this.col.innerHTML = "";
       App.setTitle(data.title);
+      const desktop = window.matchMedia && matchMedia("(min-width: 900px)").matches;
       if (!msgs.length) {
         const fresh = (data.title || "") === "New conversation";
         this.col.appendChild(this.emptyStateEl(fresh ? null : data.title));
+        if (desktop) this.input.focus();
         return;
       }
       for (const m of msgs) this.col.appendChild(this.renderMessage(m));
@@ -233,6 +236,7 @@ const Chat = {
       this.scrollToBottom();
       this.atBottom = true;
       $("#jump-latest").classList.remove("show");
+      if (desktop) this.input.focus();
     } catch (e) {
       this.col.innerHTML = `<div class="msg-error-card" style="max-width:780px;margin:20px auto">
         ${esc(e.message)}</div>`;
@@ -296,7 +300,8 @@ const Chat = {
       extra += `<div class="msg-error-card">Something went wrong while processing this request.
         <span class="small" style="opacity:.75"> · ${esc(m.error)}</span></div>`;
     }
-    const meta = [timeAgo(m.created_at), m.model ? esc(m.model) : "",
+    const time = m.created_at ? `<span title="${fullTime(m.created_at)}">${timeAgo(m.created_at)}</span>` : "";
+    const meta = [time, m.model ? esc(m.model) : "",
       m.tokens_out ? `${m.tokens_out} tokens` : ""].filter(Boolean).join(" · ");
 
     wrap.innerHTML = `

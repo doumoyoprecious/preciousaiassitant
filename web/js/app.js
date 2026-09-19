@@ -70,7 +70,16 @@ const Sidebar = {
       const sb = e.target.closest("[data-sb]");
       if (sb) {
         const act = sb.dataset.sb;
-        if (act === "new") { Chat.newChat(); this.openDrawer(false); }
+        if (act === "new") {
+          this.openDrawer(false);
+          const chatMounted = Chat.stage && Chat.stage.isConnected;
+          if (!chatMounted) {       // not on the chat view — route there first
+            App.pendingNew = true;
+            window.location.hash = "#/chat";
+          } else {
+            Chat.newChat();
+          }
+        }
         else if (act === "settings") { App.openSettings(); this.openDrawer(false); }
         else if (act === "logout") App.logout();
         else if (act === "collapse") return; // handled in init
@@ -143,7 +152,7 @@ const Sidebar = {
     el.setAttribute("aria-label", c.title || "New conversation");
     el.innerHTML = `
       <div class="t">${esc(c.title || "New conversation")}</div>
-      <div class="s">${esc(c.last_content || "—")} · ${timeAgo(c.updated_at)}</div>
+      <div class="s">${esc(previewText(c.last_content) || "—")} · ${timeAgo(c.updated_at)}</div>
       <span class="c-acts">
         <button data-cact="rename" aria-label="Rename conversation" title="Rename">${icon("pencil", 12)}</button>
         <button data-cact="delete" class="del" aria-label="Delete conversation" title="Delete">${icon("trash", 12)}</button>
@@ -175,6 +184,7 @@ const Sidebar = {
 window.App = {
   health: null,
   me: null,
+  pendingNew: false,
 
   async init() {
     // theme
@@ -251,7 +261,9 @@ window.App = {
   },
 
   setTitle(t) {
-    $("#view-title").textContent = t || "Chat";
+    const title = t || "Chat";
+    $("#view-title").textContent = title;
+    document.title = title + " · Precious AI";
   },
 
   async updateChip() {
@@ -289,7 +301,10 @@ window.App = {
     }
     const root = $("#view-root");
     VIEWS[view].init(root);
-    if (view === "chat" && arg) Chat.selectConv(arg);
+    if (view === "chat") {
+      if (arg) Chat.selectConv(arg);
+      else if (App.pendingNew) { App.pendingNew = false; Chat.newChat(); }
+    }
   },
 
   /* ---------- settings ---------- */

@@ -363,18 +363,37 @@ function modal({ title, body, actions, wide = false }) {
     box.appendChild(acts);
     back.appendChild(box);
     back.addEventListener("click", e => { if (e.target === back) close("cancel"); });
-    const onKey = e => { if (e.key === "Escape") { document.removeEventListener("keydown", onKey); close("cancel"); } };
+    const previouslyFocused = document.activeElement;
+    const onKey = e => {
+      if (e.key === "Escape") { document.removeEventListener("keydown", onKey); close("cancel"); }
+      else if (e.key === "Tab") trapFocus(e, box);
+    };
     document.addEventListener("keydown", onKey);
     function close(v) {
       document.removeEventListener("keydown", onKey);
       resolve(v);
       // remove on next tick so `await modal()` callers can still read field values
-      setTimeout(() => { if (back.isConnected) root.innerHTML = ""; }, 0);
+      setTimeout(() => {
+        if (back.isConnected) root.innerHTML = "";
+        if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
+      }, 0);
     }
     root.appendChild(back);
     const first = box.querySelector("input, textarea, select");
     if (first) setTimeout(() => first.focus(), 60);
+    else setTimeout(() => { const b = box.querySelector("button"); if (b) b.focus(); }, 60);
   });
+}
+
+/* Keep keyboard focus inside an open dialog (ARIA dialog semantics). */
+function trapFocus(e, box) {
+  const focusables = [...box.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
+  ].filter(el => el.offsetParent !== null || el === document.activeElement);
+  if (!focusables.length) return;
+  const first = focusables[0], last = focusables[focusables.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
 }
 
 async function confirmModal(message, { danger = false, confirmLabel = "Confirm", requireType = null } = {}) {
@@ -421,6 +440,30 @@ function timeAgo(ts) {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   if (s < 7 * 86400) return `${Math.floor(s / 86400)}d ago`;
   return fmtTime(ts);
+}
+
+/* Full local timestamp (for title= tooltips on relative times). */
+function fullTime(ts) {
+  if (!ts) return "";
+  const d = new Date(ts * 1000);
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+/* Strip markdown noise for one-line previews (sidebar history). */
+function previewText(t) {
+  return String(t || "")
+    .replace(/```[\s\S]*?(```|$)/g, " ")   // code fences
+    .replace(/`([^`]*)`/g, "$1")           // inline code
+    .replace(/\*\*([^*]*)\*\*/g, "$1")     // bold
+    .replace(/__([^_]*)__/g, "$1")         // bold (alt)
+    .replace(/\[S\d+\]/g, "")              // citations
+    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, "$1") // links
+    .replace(/^#{1,6}\s+/gm, "")           // headings
+    .replace(/^\s*\|.*$/gm, " ")           // table rows
+    .replace(/^>\s?/gm, "")                // quotes
+    .replace(/^\s*[-*]\s+/gm, "")          // list bullets
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 const SUPPORTED_EXT = /\.(pdf|docx|txt|md|markdown|csv)$/i;
