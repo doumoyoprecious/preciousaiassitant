@@ -1,5 +1,4 @@
 {
-  "$comment": "Vercel config for the Precious AI static UI. Deploy this web/ directory as a Vercel project (root = web/). For split hosting, set window.PA_API in config.js to your API server URL.",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
