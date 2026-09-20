@@ -187,7 +187,7 @@ const Chat = {
     Sidebar.refresh();
     if (this.current) {
       const c = this.convs.find(x => x.id === this.current);
-      if (c && c.title && window.App) App.setTitle(c.title);
+      if (c && c.title && window.App) App.setTitle(displayTitle(c.title));
     }
     if (!this.current && preferId && this.convs.some(c => c.id === preferId)) {
       this.selectConv(preferId, true);
@@ -216,18 +216,19 @@ const Chat = {
     this.current = id;
     Sidebar.refresh();
     const conv = this.convs.find(c => c.id === id);
-    App.setTitle(conv ? conv.title : "Chat");
+    App.setTitle(conv ? displayTitle(conv.title) : "Chat");
 
-    this.col.innerHTML = `<div class="small faint" style="padding:26px 6px">Loading…</div>`;
+    this.col.innerHTML = `<div class="card skel-card" role="status" aria-label="Loading conversation">
+      <div class="skel w40"></div><div class="skel w90"></div><div class="skel w70"></div></div>`;
     try {
       const data = await api(`/api/conversations/${id}`);
       const msgs = await api(`/api/conversations/${id}/messages`);
       this.col.innerHTML = "";
-      App.setTitle(data.title);
+      App.setTitle(displayTitle(data.title));
       const desktop = window.matchMedia && matchMedia("(min-width: 900px)").matches;
       if (!msgs.length) {
         const fresh = (data.title || "") === "New conversation";
-        this.col.appendChild(this.emptyStateEl(fresh ? null : data.title));
+        this.col.appendChild(this.emptyStateEl(fresh ? null : displayTitle(data.title)));
         if (desktop) this.input.focus();
         return;
       }
@@ -247,7 +248,7 @@ const Chat = {
     const wrap = document.createElement("div");
     wrap.className = "empty-state";
     wrap.innerHTML = `
-      <div class="logo">✦</div>
+      <div class="logo" aria-hidden="true">${logoMark(22)}</div>
       <h2>${convoTitle ? esc(convoTitle) : "Precious AI"}</h2>
       <div class="sub">${convoTitle ? "Ask a question or attach a document to get started." : "How can I help you today?"}</div>
       ${convoTitle ? "" : `
@@ -305,7 +306,6 @@ const Chat = {
       m.tokens_out ? `${m.tokens_out} tokens` : ""].filter(Boolean).join(" · ");
 
     wrap.innerHTML = `
-      <div class="avatar" aria-hidden="true">✦</div>
       <div class="msg-body">
         ${m.error ? "" : `<div class="msg-text">${md(m.content)}</div>`}
         ${extra}
@@ -342,7 +342,6 @@ const Chat = {
     el.className = "msg ai";
     el.dataset.pending = "1";
     el.innerHTML = `
-      <div class="avatar" aria-hidden="true">✦</div>
       <div class="msg-body">
         <div class="thinking">
           <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -361,7 +360,7 @@ const Chat = {
     if (!this.current) await this.newChat(true);
     const convId = this.current;
     const conv = this.convs.find(c => c.id === convId);
-    const isTraining = this.files.length === 0 && (conv && (conv.title || "").startsWith("🎓"));
+    const isTraining = this.files.length === 0 && (conv && isTrainingTitle(conv.title));
 
     // optimistic user message
     const es = this.col.querySelector(".empty-state");
@@ -424,7 +423,6 @@ const Chat = {
     const box = document.createElement("div");
     box.className = "msg ai";
     box.innerHTML = `
-      <div class="avatar" aria-hidden="true">✦</div>
       <div class="msg-body">
         <div class="msg-error-card">
           Something went wrong while processing your request.

@@ -17,13 +17,16 @@ const Knowledge = {
           </select>
         </div>
         <div class="row" style="margin-bottom:16px">
-          <button class="btn btn-primary" data-k="upload">⬆ Upload document</button>
-          <button class="btn" data-k="text">✍ Add text / note</button>
-          <button class="btn" data-k="url">🔗 Add website</button>
+          <button class="btn btn-primary" data-k="upload">${icon("upload", 14)} Upload document</button>
+          <button class="btn" data-k="text">${icon("pencil", 14)} Add text / note</button>
+          <button class="btn" data-k="url">${icon("link", 14)} Add website</button>
           <input type="file" id="kb-file" class="hidden" multiple accept=".pdf,.txt,.md,.markdown,.csv,.docx">
         </div>
         <div id="kb-search-results" class="hidden" style="margin-bottom:16px"></div>
-        <div id="kb-list"><div class="small faint" style="padding:16px">Loading…</div></div>
+        <div id="kb-list">
+          <div class="card skel-card" role="status" aria-label="Loading documents"><div class="skel w40"></div><div class="skel w90"></div></div>
+          <div class="card skel-card" role="status" aria-hidden="true"><div class="skel w40"></div><div class="skel w70"></div></div>
+        </div>
       </div>`;
 
     $("#kb-file", root).onclick = e => e.preventDefault();
@@ -71,10 +74,10 @@ const Knowledge = {
       return;
     }
     if (!docs.length) {
-      list.innerHTML = `<div class="empty-state card" style="padding:40px">
-        <div class="big">📚</div>
-        <div><b>Your knowledge base is empty.</b></div>
-        <div class="small">Upload PDFs, DOCX, TXT, MD or CSV files, add notes, or save a website.</div></div>`;
+      list.innerHTML = `<div class="empty-state card" style="padding:44px 30px">
+        <div class="big">${icon("doc", 20)}</div>
+        <div style="font-weight:600;font-size:14.5px">Your knowledge base is empty</div>
+        <div class="small" style="margin-top:4px">Upload PDF, DOCX, TXT, MD or CSV files, add a note, or save a website.</div></div>`;
       return;
     }
     list.innerHTML = "";

@@ -1,6 +1,6 @@
 # Precious AI — Workflow Test Report
 
-- Run at: 2026-09-19T12:35:32
+- Run at: 2026-09-20T14:52:45
 - Target: http://127.0.0.1:8000
 - Embedder: sentence-transformers/all-MiniLM-L6-v2 (local ONNX, free)
 - Provider/model: groq / openai/gpt-oss-120b

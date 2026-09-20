@@ -55,7 +55,7 @@ const Admin = {
           [c.conversations, "Conversations"], [c.user_messages, "Your messages"],
           [c.documents, "Knowledge docs"], [c.chunks, "Indexed chunks"],
           [c.memories, "Long-term memories"], [c.pending_suggestions, "Pending suggestions"],
-          [o.feedback.helpful, "👍 Helpful"], [o.feedback.not_helpful + o.feedback.issues, "👎 Not helpful"],
+          [o.feedback.helpful, "Helpful ratings"], [o.feedback.not_helpful + o.feedback.issues, "Not helpful / issues"],
         ].map(([n, l]) => `<div class="stat"><div class="n">${n ?? 0}</div><div class="l">${l}</div></div>`).join("")}
       </div>
       <div class="grid grid-2">
@@ -209,7 +209,7 @@ const Admin = {
         <label class="field"><span>Timezone (for date/time tool & context)</span>
           <input id="st-tz" type="text" value="${esc(s.timezone)}" placeholder="Africa/Lagos"></label>
         <button class="btn btn-primary" id="st-save">Save settings</button>
-        <span class="chip" id="st-status" style="margin-left:10px">${health.api_key_configured ? "API key configured" : "⚠ No API key yet — see API Keys tab"}</span>
+        <span class="chip" id="st-status" style="margin-left:10px">${health.api_key_configured ? "API key configured" : "No API key yet — see API Keys tab"}</span>
       </div>`;
     const loadPicks = async () => {
       try {
@@ -338,7 +338,7 @@ const Admin = {
         <label class="field"><span>Notes</span><input id="ev-notes" type="text"></label>
         <button class="btn btn-primary" id="ev-add">Add case</button>
         <span class="spacer"></span>
-        <button class="btn" id="ev-run-all">▶ Run all cases</button>
+        <button class="btn" id="ev-run-all">${icon("play", 13)} Run all cases</button>
       </div>
       <div class="card">
         <h3>Test cases & results</h3>
@@ -352,7 +352,7 @@ const Admin = {
               ${r && r.score != null ? `<span class="small">score ${(r.score * 100).toFixed(0)}%</span>` : ""}
               <span class="small faint">${r ? fmtTime(r.created_at) : ""}</span>
               <span class="spacer"></span>
-              <button class="btn btn-sm" data-run="${c.id}">▶ Run</button>
+              <button class="btn btn-sm" data-run="${c.id}">${icon("play", 12)} Run</button>
               <button class="btn btn-sm btn-danger" data-dc="${c.id}">Delete</button>
             </div>
             <div style="font-size:13.5px"><b>Q:</b> ${esc(c.question)}</div>
@@ -363,9 +363,9 @@ const Admin = {
                 <summary class="small" style="cursor:pointer;color:var(--accent2)">Actual answer & details</summary>
                 <div class="small" style="margin-top:8px;white-space:pre-wrap;background:var(--bg2);border-radius:8px;padding:10px">${esc(r.answer || r.error || "(no answer)")}</div>
                 ${r.flags && JSON.parse(r.flags || "[]").length ? `<div class="small" style="margin-top:6px">
-                  ${JSON.parse(r.flags).map(f => `<div>⚑ ${esc(f)}</div>`).join("")}</div>` : ""}
+                  ${JSON.parse(r.flags).map(f => `<div style="display:flex;gap:6px;align-items:center">${icon("flag", 11)} ${esc(f)}</div>`).join("")}</div>` : ""}
                 ${r.expected_hits ? `<div class="small" style="margin-top:6px">${(JSON.parse(r.expected_hits)).map(h =>
-                  `<span class="badge ${h.hit ? "badge-ok" : "badge-err"}" style="margin-right:6px">${h.hit ? "✓" : "✗"} ${esc(h.phrase)}</span>`).join("")}</div>` : ""}
+                  `<span class="badge ${h.hit ? "badge-ok" : "badge-err"}" style="margin-right:6px">${h.hit ? "found" : "missing"} · ${esc(h.phrase)}</span>`).join("")}</div>` : ""}
               </details>` : ""}
           </div>`;
         }).join("") : `<div class="small faint" style="padding:10px">No test cases yet. Add your first one above — a good starting point: questions your documents answer.</div>`}
@@ -412,7 +412,7 @@ const Admin = {
       <div class="row" style="margin-bottom:12px">
         ${["all", "down", "issue"].map(f => `
           <button class="btn btn-sm ${filter === f ? "btn-primary" : ""}" data-fb="${f}">
-            ${f === "all" ? "All" : f === "down" ? "👎 Not helpful" : "⚠ Issues"} (${f === "all" ? rows.length : ""})</button>`).join("")}
+            ${f === "all" ? "All" : f === "down" ? "Not helpful" : "Issues"} (${f === "all" ? rows.length : ""})</button>`).join("")}
       </div>
       ${rows.length ? rows.map(r => `
         <div class="doc-card">
@@ -426,9 +426,9 @@ const Admin = {
           ${r.corrected_answer ? `<div class="small" style="margin-top:6px"><b>Your correction:</b> ${esc(r.corrected_answer)}</div>` : ""}
           ${(r.rating === "down" || r.rating === "issue") && (r.corrected_answer || r.note) ? `
             <div class="row" style="margin-top:10px">
-              <button class="btn btn-sm" data-sfk="${r.id}">💾 Save correction as FAQ (fixes this gap)</button>
+              <button class="btn btn-sm" data-sfk="${r.id}">${icon("save", 13)} Save correction as FAQ</button>
             </div>` : ""}
-        </div>`).join("") : `<div class="card small muted">No ${filter === "all" ? "" : filter + " "}feedback yet. Feedback appears when you tap 👍/👎/ on answers in chat.</div>`}`;
+        </div>`).join("") : `<div class="card small muted">No ${filter === "all" ? "" : filter + " "}feedback yet. Feedback appears when you rate an answer in chat.</div>`}`;
     el.querySelectorAll("[data-fb]").forEach(b => b.onclick = () => this.tabFeedback(el, b.dataset.fb));
     el.querySelectorAll("[data-sfk]").forEach(b => b.onclick = async () => {
       const row = rows.find(x => x.id === b.dataset.sfk);
@@ -458,7 +458,7 @@ const Admin = {
             <td class="small">${esc(r.area)}</td>
             <td class="small">${esc(r.message)}</td>
           </tr>`).join("")}</table></div>`
-          : `<div class="small faint" style="padding:10px">No errors logged. 🎉</div>`}
+          : `<div class="small faint" style="padding:10px">No errors logged.</div>`}
       </div>`;
     $("#err-clear", el).onclick = async () => {
       const ok = await confirmModal("Clear all error logs?");
@@ -476,7 +476,7 @@ const Admin = {
           <h3>Export</h3>
           <p class="sub">Download everything (conversations, knowledge documents list, memories,
           instructions, feedback, settings) as JSON.</p>
-          <button class="btn btn-primary" id="data-export" style="margin-top:10px">⬇ Export my data</button>
+          <button class="btn btn-primary" id="data-export" style="margin-top:10px">${icon("download", 14)} Export my data</button>
         </div>
         <div class="card">
           <h3>Delete data</h3>

@@ -121,3 +121,40 @@ Verification (this pass):
 New screenshots: `qa-shots/audit-*.png` (auth, post-login, knowledge,
 memory, training, rich chat, 9 admin tabs, rail, mobile ×3) and
 `qa-shots/smoke-*.png`.
+
+## Design system v3 — modern minimalist redesign (final)
+
+Complete front-end redesign to a modern, minimalist, professional design
+language. Frontend-only: no backend, API, auth, Groq/RAG, or Vercel-config
+changes.
+
+**Design system**
+- Neutral professional palette (light: white surfaces / zinc neutrals; dark:
+  #0f1012 surfaces), single blue accent for interactive states, near-black
+  primary actions.
+- Lucide-style stroke SVG icon system (no emoji anywhere in the UI; the
+  old `✦`/`🎓`/`📚` glyphs replaced by an SVG brand mark and icon buttons).
+- Restraint pass: 1px borders, minimal shadows, 8–14px radii, consistent
+  spacing, tighter type scale, tabular numerals for stats.
+- New: skeleton loaders (conversations, KB list, memory list, admin tabs),
+  masked-SVG roadmap checkmarks, refined code blocks / tables / badges.
+- Training-conversation marker moved from a `🎓` title prefix to a stable
+  text title ("Training session") with legacy-title compatibility and a
+  `displayTitle()` normalizer for the UI.
+
+**Verification (this redesign)**
+- `tests/test_workflows.py` — 86/86 (backend contracts incl. live AI, RAG,
+  citations, uploads, memory, training, admin, auth).
+- Live visual/functional audit (Playwright + real Groq) — 41/41: pristine
+  first-run → setup → login → KB/memory/training views → rich chat
+  (table + code + citations, jump-to-latest) → new-chat-from-any-view →
+  delete with confirm → all 10 admin tabs → collapsed rail → modal focus
+  trap → theme toggle/persistence → logout/login → mobile 375 (no
+  horizontal overflow, drawer) → reduced motion → **emoji scan of every
+  rendered view (zero found)**.
+- No API contract changes; no new runtime dependencies; `vercel.json` and
+  deployment config untouched; CSP (`script-src 'self'`) still satisfied
+  (all JS external, pre-paint theme via `/js/theme.js`).
+
+Screenshots: `qa-shots/final-*.png` (auth, post-login, knowledge, memory,
+training, rich chat, admin overview/settings, rail, dark, mobile ×4).

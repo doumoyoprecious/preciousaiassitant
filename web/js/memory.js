@@ -9,18 +9,18 @@ const Memory = {
     root.innerHTML = `
       <div class="page">
         <div class="card" style="margin-bottom:14px">
-          <h3>🧠 Long-term memory</h3>
+          <h3>Long-term memory</h3>
           <p class="sub">Only information you explicitly save (or approve) is stored here. Precious AI never
           silently remembers conversations — it asks first with a suggestion chip.</p>
         </div>
         <div id="mem-suggestions"></div>
         <div class="card" style="margin-bottom:14px">
           <div class="row" style="margin-bottom:10px">
-            <input id="mem-search" type="search" placeholder="Search memories…" style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:9px 12px">
-            <button class="btn" id="mem-add-btn">＋ Add memory</button>
+            <input id="mem-search" type="search" placeholder="Search memories…" style="flex:1;min-width:140px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px" aria-label="Search memories">
+            <button class="btn" id="mem-add-btn">${icon("plus", 14)} Add memory</button>
             <button class="btn btn-danger" id="mem-clear-btn">Clear all</button>
           </div>
-          <div id="mem-list"><div class="small faint">Loading…</div></div>
+          <div id="mem-list"><div class="skel w70" style="margin-bottom:10px"></div><div class="skel w90"></div></div>
         </div>
       </div>`;
     $("#mem-clear-btn", root).onclick = async () => {
@@ -62,8 +62,8 @@ const Memory = {
         </div>
         <div style="font-size:13.5px;font-style:italic">“${esc(s.content)}”</div>
         <div class="row" style="margin-top:10px">
-          <button class="btn btn-sm btn-primary" data-a="approve">✓ Approve & save</button>
-          <button class="btn btn-sm" data-a="reject">✕ Reject</button>
+          <button class="btn btn-sm btn-primary" data-a="approve">${icon("check", 13)} Approve & save</button>
+          <button class="btn btn-sm" data-a="reject">${icon("x", 13)} Reject</button>
         </div>`;
       card.querySelector('[data-a=approve]').onclick = async () => {
         try {

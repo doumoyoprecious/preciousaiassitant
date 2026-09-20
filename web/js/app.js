@@ -32,7 +32,7 @@ const Sidebar = {
   renderInto(pane) {
     pane.innerHTML = `
       <div class="sb-brand">
-        <span class="brand-mark" aria-hidden="true">✦</span>
+        <span class="brand-mark" aria-hidden="true">${logoMark(15)}</span>
         <span class="brand-name">Precious AI</span>
         ${pane.id === "sidebar"
           ? `<button data-sb="collapse" aria-label="Collapse sidebar" title="Collapse sidebar">
@@ -151,7 +151,7 @@ const Sidebar = {
     el.setAttribute("aria-current", c.id === Chat.current ? "true" : "false");
     el.setAttribute("aria-label", c.title || "New conversation");
     el.innerHTML = `
-      <div class="t">${esc(c.title || "New conversation")}</div>
+      <div class="t">${esc(displayTitle(c.title) || "New conversation")}</div>
       <div class="s">${esc(previewText(c.last_content) || "—")} · ${timeAgo(c.updated_at)}</div>
       <span class="c-acts">
         <button data-cact="rename" aria-label="Rename conversation" title="Rename">${icon("pencil", 12)}</button>
@@ -294,7 +294,7 @@ window.App = {
     $$(".side-nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
     if (view === "chat") {
       const conv = Chat.convs.find(c => c.id === Chat.current);
-      this.setTitle(conv ? (conv.title || "New chat") : "Chat");
+      this.setTitle(conv ? (displayTitle(conv.title) || "New chat") : "Chat");
     } else {
       this.setTitle({ knowledge: "Knowledge", memory: "Memory",
         training: "Learn", admin: "Admin" }[view] || "Precious AI");

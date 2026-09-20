@@ -9,7 +9,7 @@ const Training = {
     root.innerHTML = `
       <div class="page">
         <div class="card" style="margin-bottom:14px">
-          <h3>🎓 Training Mode</h3>
+          <h3>Training Mode</h3>
           <p class="sub">Teach Precious AI directly — facts, preferences, response formats, terminology,
           business rules and workflows. Everything you save here is <b>explicitly stored</b> (long-term memory
           or knowledge base) and used in every future conversation. This does not modify the underlying AI
@@ -75,8 +75,8 @@ const Training = {
     $("#t-practice", root).onclick = async () => {
       try {
         const convs = await api("/api/conversations");
-        let conv = convs.find(c => (c.title || "").startsWith("🎓"));
-        if (!conv) conv = await api("/api/conversations", { body: { title: "🎓 Training session" } });
+        let conv = convs.find(c => isTrainingTitle(c.title));
+        if (!conv) conv = await api("/api/conversations", { body: { title: TRAINING_CONV_TITLE } });
         window.location.hash = "#/chat/" + conv.id;
         toast("Training conversation opened — things you teach here are handled in training mode.", "ok");
       } catch (e) { toast(e.message, "err"); }
